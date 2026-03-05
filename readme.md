@@ -39,39 +39,9 @@
 
 ---
 
-## 3. 架构蓝图 (Monorepo)
-
-项目目录必须遵循以下结构。代码助手在创建文件时需严格按照此扁平化的路径规范进行对应：
-
-* **`project_root/.env`**：本地开发环境变量配置文件（包含数据库、缓存类型、各类 API Key，**禁止提交至 Git**）
-* **`project_root/.env.example`**：环境变量配置模板（用于示例和部署参考，**需提交至 Git**）
-* **`project_root/devops/`**：部署与基础设施（包含 docker-compose.yml, nginx.conf）
-* **`project_root/protos/`**：双端共享协议定义（包含 chat.proto, build_protos.sh）
-* **`project_root/server/alembic/`**：通用数据库迁移配置
-* **`project_root/server/app/api/`**：REST 接口（认证、同步、上传、机器人）
-* **`project_root/server/app/core/`**：核心基建（DB 引擎工厂、安全配置、WS 连接管理器、基于 `.env` 的全局 Settings）
-* **`project_root/server/app/models/`**：SQLAlchemy 声明式 ORM 模型
-* **`project_root/server/app/services/`**：核心策略与工厂服务（包含 cache, storage, llm, push 模块）
-* **`project_root/server/app/tasks/`**：后台异步任务（Webhook 分发、推送执行）
-* **`project_root/server/main.py`**：后端应用入口文件
-* **`project_root/server/requirements.txt`**：后端依赖清单
-* **`project_root/client/lib/generated/`**：Protobuf 编译生成的 Dart 文件存放目录
-* **`project_root/client/lib/features/`**：Flutter 客户端功能模块（认证、聊天、设置）
-* **`project_root/client/lib/core/`**：Flutter 客户端核心基建（网络、本地数据库、工具类）
-* **`project_root/client/pubspec.yaml`**：Flutter 依赖配置文件
-* **`project_root/readme.md`**：本需求规则文档
-
----
 
 ## 4. 功能清单 (完成定义)
 
-**✅ A 部分：客户端功能 (Flutter)**
-
-* **初始设置与安全**：登录前验证服务器地址与“服务器密钥”连通性。
-* **身份验证**：注册 (Pending 状态待审批) 与登录 (获取 JWT)。
-* **聊天核心与 UI**：支持全媒体渲染，发送状态机反馈，结合本地库的无限滚动加载。
-* **消息同步与重连**：基于指数退避的断线重连，发送 `Message_ID` 水位线主动拉取 (Pull) 离线消息。
-* **本地资源管理**：媒体文件本地缓存映射与上限清理。
 
 **✅ B 部分：后端功能 (Python)**
 
