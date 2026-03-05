@@ -19,19 +19,35 @@ const _clients = new Map();
 //  配置路径辅助
 // ------------------------------------------------------------------ //
 //  OpenClaw 全局配置 (cfg) 是一个 plain object。
-//  插件配置约定存储在 cfg.plugins?.[CHANNEL_ID]?.accounts 下。
+//  遵循 OpenClaw 内置 channel 惯例，存储在 cfg.channels?.[CHANNEL_ID] 下:
+//
+//  ~/.openclaw/openclaw.json:
+//  {
+//    "channels": {
+//      "imai": {
+//        "accounts": {
+//          "default": {
+//            "serverUrl": "http://your-server:8000",
+//            "serverSecretKey": "...",
+//            "username": "openclaw-bot",
+//            "password": "..."
+//          }
+//        }
+//      }
+//    }
+//  }
 
 function getAccounts(cfg) {
-  return cfg?.plugins?.[CHANNEL_ID]?.accounts ?? {};
+  return cfg?.channels?.[CHANNEL_ID]?.accounts ?? {};
 }
 
 function setAccount(cfg, accountId, data) {
   return {
     ...cfg,
-    plugins: {
-      ...cfg?.plugins,
+    channels: {
+      ...cfg?.channels,
       [CHANNEL_ID]: {
-        ...cfg?.plugins?.[CHANNEL_ID],
+        ...cfg?.channels?.[CHANNEL_ID],
         accounts: {
           ...getAccounts(cfg),
           [accountId]: data,
@@ -46,10 +62,10 @@ function removeAccount(cfg, accountId) {
   delete accounts[accountId];
   return {
     ...cfg,
-    plugins: {
-      ...cfg?.plugins,
+    channels: {
+      ...cfg?.channels,
       [CHANNEL_ID]: {
-        ...cfg?.plugins?.[CHANNEL_ID],
+        ...cfg?.channels?.[CHANNEL_ID],
         accounts,
       },
     },
