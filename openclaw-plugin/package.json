@@ -1,0 +1,24 @@
+{
+  "name": "@openclaw-plugin/imai",
+  "version": "1.0.0",
+  "description": "OpenClaw channel plugin for ImAI self-hosted IM server",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": ["openclaw", "openclaw-plugin", "imai", "channel"],
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "dependencies": {
+    "protobufjs": "^7.4.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0"
+  }
+}

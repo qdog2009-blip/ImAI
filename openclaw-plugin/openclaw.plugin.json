@@ -1,0 +1,46 @@
+{
+  "id": "imai",
+  "name": "ImAI",
+  "description": "Connect OpenClaw to the ImAI self-hosted IM server. Lets any ImAI user send messages directly to the OpenClaw AI agent.",
+  "version": "1.0.0",
+  "channels": ["imai"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "accounts": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["serverUrl", "serverSecretKey", "username", "password"],
+          "properties": {
+            "serverUrl": {
+              "type": "string",
+              "description": "ImAI server HTTP base URL, e.g. http://localhost:8000"
+            },
+            "serverSecretKey": {
+              "type": "string",
+              "description": "SERVER_SECRET_KEY configured on the ImAI server"
+            },
+            "username": {
+              "type": "string",
+              "description": "ImAI account username for the OpenClaw bot"
+            },
+            "password": {
+              "type": "string",
+              "description": "ImAI account password for the OpenClaw bot"
+            },
+            "deviceId": {
+              "type": "string",
+              "description": "Unique device identifier (defaults to openclaw-plugin)"
+            }
+          }
+        }
+      }
+    },
+    "uiHints": {
+      "accounts": { "secret": ["serverSecretKey", "password"] }
+    }
+  }
+}

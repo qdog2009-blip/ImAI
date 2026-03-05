@@ -1,4 +1,0 @@
-websockets>=14.0
-aiohttp>=3.9
-protobuf>=5.0
-pydantic-settings>=2.7
