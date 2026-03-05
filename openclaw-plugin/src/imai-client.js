@@ -41,11 +41,14 @@ export class ImAIClient {
     this.deviceId = opts.deviceId ?? "openclaw-plugin";
     this.onMessage = opts.onMessage;
     this.log = opts.log ?? console;
+    /** 初始水位线（从持久化存储中加载） */
+    this._lastServerMsgId = opts.initialLastMsgId ?? 0;
+    /** 水位线更新时的回调，用于持久化 */
+    this._onLastMsgIdUpdate = opts.onLastMsgIdUpdate ?? null;
 
     this._userId = "";
     this._token = "";
     this._ws = null;
-    this._lastServerMsgId = 0;
     this._stopped = false;
   }
 
@@ -202,6 +205,7 @@ export class ImAIClient {
         const msg = envelope.chatMessage;
         if (msg.serverMsgId > this._lastServerMsgId) {
           this._lastServerMsgId = msg.serverMsgId;
+          this._onLastMsgIdUpdate?.(this._lastServerMsgId);
         }
         await this._handleChatMessage(msg);
         break;
@@ -217,6 +221,9 @@ export class ImAIClient {
             this._lastServerMsgId = msg.serverMsgId;
           }
           await this._handleChatMessage(msg);
+        }
+        if (sync.messages?.length > 0) {
+          this._onLastMsgIdUpdate?.(this._lastServerMsgId);
         }
         break;
       }

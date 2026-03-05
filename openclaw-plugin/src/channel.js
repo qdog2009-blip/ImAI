@@ -8,6 +8,8 @@
  *  - outbound  : 将 OpenClaw AI 回复通过 ImAI WebSocket 发回给用户
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { ImAIClient } from "./imai-client.js";
 
 const CHANNEL_ID = "imai";
@@ -199,6 +201,26 @@ export function createImAIChannel() {
 
         setStatus?.({ id: account.id, state: "configured", label: "连接中…" });
 
+        // 推导水位线文件路径（与 sessions.json 同目录）
+        const { session } = channelRuntime;
+        const sessionsPath = session.resolveStorePath(undefined, {});
+        const watermarkPath = path.join(
+          path.dirname(sessionsPath),
+          `imai-${account.id}-watermark.json`
+        );
+
+        // 加载持久化水位线
+        let initialLastMsgId = 0;
+        try {
+          const data = JSON.parse(fs.readFileSync(watermarkPath, "utf8"));
+          if (typeof data.lastServerMsgId === "number") {
+            initialLastMsgId = data.lastServerMsgId;
+          }
+        } catch {
+          // 文件不存在或解析失败时从 0 开始
+        }
+        logger.info(`[imai] 加载水位线 lastServerMsgId=${initialLastMsgId}`);
+
         const client = new ImAIClient({
           serverUrl:       account.serverUrl,
           serverSecretKey: account.serverSecretKey,
@@ -206,6 +228,16 @@ export function createImAIChannel() {
           password:        account.password,
           deviceId:        account.deviceId ?? "openclaw-plugin",
           log:             logger,
+          initialLastMsgId,
+
+          /** 水位线更新时持久化到磁盘 */
+          onLastMsgIdUpdate: (id) => {
+            try {
+              fs.writeFileSync(watermarkPath, JSON.stringify({ lastServerMsgId: id }), "utf8");
+            } catch (err) {
+              logger.error(`[imai] 水位线写入失败: ${err.message}`);
+            }
+          },
 
           /** 收到 ImAI 用户消息时的回调 */
           onMessage: async (incoming) => {
