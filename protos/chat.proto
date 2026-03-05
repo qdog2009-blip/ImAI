@@ -1,0 +1,303 @@
+syntax = "proto3";
+package imai;
+
+// ============================================================
+//  顶层信封 — 所有 WebSocket 帧统一封装
+//  客户端/服务端通过 type 字段路由到对应处理器
+// ============================================================
+
+message Envelope {
+  EnvelopeType type   = 1;
+  int64  timestamp_ms = 2;   // 发送时间戳 (Unix 毫秒)
+  string request_id   = 3;   // 请求-响应关联 ID (UUID)
+
+  oneof payload {
+    // 认证
+    AuthRequest       auth_request        = 10;
+    AuthResponse      auth_response       = 11;
+
+    // 心跳
+    Ping              ping                = 20;
+    Pong              pong                = 21;
+
+    // 聊天消息
+    ChatMessage       chat_message        = 30;
+    MessageAck        message_ack         = 31;
+
+    // 已读回执
+    ReadReceipt       read_receipt        = 40;
+
+    // 离线消息同步 (水位线拉取)
+    SyncRequest       sync_request        = 50;
+    SyncResponse      sync_response       = 51;
+
+    // 在线状态
+    PresenceNotify    presence_notify     = 60;
+
+    // AI 机器人
+    BotRequest        bot_request         = 70;
+    BotResponse       bot_response        = 71;
+    BotStreamChunk    bot_stream_chunk    = 72;
+
+    // 会话管理
+    KickNotice        kick_notice         = 80;
+
+    // 错误通知
+    ErrorNotice       error_notice        = 90;
+  }
+}
+
+enum EnvelopeType {
+  ENVELOPE_TYPE_UNSPECIFIED = 0;
+
+  // 认证
+  AUTH_REQUEST              = 1;
+  AUTH_RESPONSE             = 2;
+
+  // 心跳
+  PING                      = 10;
+  PONG                      = 11;
+
+  // 聊天
+  CHAT_MESSAGE              = 20;
+  MESSAGE_ACK               = 21;
+
+  // 已读
+  READ_RECEIPT              = 30;
+
+  // 同步
+  SYNC_REQUEST              = 40;
+  SYNC_RESPONSE             = 41;
+
+  // 在线状态
+  PRESENCE_NOTIFY           = 50;
+
+  // 机器人
+  BOT_REQUEST               = 60;
+  BOT_RESPONSE              = 61;
+  BOT_STREAM_CHUNK          = 62;
+
+  // 会话管理
+  KICK_NOTICE               = 70;
+
+  // 错误
+  ERROR_NOTICE              = 80;
+}
+
+// ============================================================
+//  认证 — 服务器密钥校验 + JWT 登录
+// ============================================================
+
+message AuthRequest {
+  string server_secret_key = 1;   // 客户端持有的服务器密钥
+  string token             = 2;   // JWT (登录后携带)
+  string device_id         = 3;   // 设备唯一标识
+  DeviceType device_type   = 4;
+}
+
+message AuthResponse {
+  bool   success = 1;
+  string message = 2;             // 失败原因描述
+  string user_id = 3;             // 认证通过后返回
+}
+
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED = 0;
+  ANDROID                 = 1;
+  IOS                     = 2;
+  WEB                     = 3;
+  DESKTOP                 = 4;
+}
+
+// ============================================================
+//  心跳 — Ping/Pong 保活
+// ============================================================
+
+message Ping {}
+message Pong {}
+
+// ============================================================
+//  聊天消息 — 全媒体类型
+// ============================================================
+
+message ChatMessage {
+  string client_msg_id  = 1;   // 客户端生成 UUID (防重防抖)
+  int64  server_msg_id  = 2;   // 服务端单调递增 ID (水位线基准)
+  string sender_id      = 3;
+  string receiver_id    = 4;   // 用户 ID 或群组 ID
+  ChannelType channel   = 5;
+  ContentType content_type = 6;
+  int64  created_at     = 7;   // 服务端落库时间 (Unix 毫秒)
+
+  // 消息体 — 按内容类型二选一
+  oneof body {
+    TextContent     text     = 20;
+    ImageContent    image    = 21;
+    AudioContent    audio    = 22;
+    VideoContent    video    = 23;
+    FileContent     file     = 24;
+    LocationContent location = 25;
+  }
+
+  // @提及 (推送路由判定)
+  repeated string mention_user_ids = 30;
+  bool mention_all                 = 31;
+
+  // 引用/回复
+  string reply_to_msg_id = 32;
+}
+
+enum ChannelType {
+  CHANNEL_TYPE_UNSPECIFIED = 0;
+  PRIVATE                  = 1;   // 私聊
+  GROUP                    = 2;   // 群聊
+}
+
+enum ContentType {
+  CONTENT_TYPE_UNSPECIFIED = 0;
+  TEXT                     = 1;
+  IMAGE                    = 2;
+  AUDIO                    = 3;
+  VIDEO                    = 4;
+  FILE                     = 5;
+  LOCATION                 = 6;
+}
+
+// -------------------- 消息体定义 --------------------
+
+message TextContent {
+  string text = 1;
+}
+
+message ImageContent {
+  string url       = 1;   // 文件服务 HTTP 地址
+  string thumbnail_url = 2;
+  int32  width     = 3;
+  int32  height    = 4;
+  int64  size      = 5;   // 字节
+}
+
+message AudioContent {
+  string url      = 1;
+  int32  duration = 2;    // 秒
+  int64  size     = 3;
+}
+
+message VideoContent {
+  string url           = 1;
+  string thumbnail_url = 2;
+  int32  duration      = 3;
+  int32  width         = 4;
+  int32  height        = 5;
+  int64  size          = 6;
+}
+
+message FileContent {
+  string url       = 1;
+  string file_name = 2;
+  int64  size      = 3;
+}
+
+message LocationContent {
+  double latitude  = 1;
+  double longitude = 2;
+  string address   = 3;
+}
+
+// ============================================================
+//  消息确认 — 发送状态机 (sending → sent → delivered → read)
+// ============================================================
+
+message MessageAck {
+  string client_msg_id = 1;   // 对应原始消息
+  int64  server_msg_id = 2;   // 服务端分配的 ID
+  AckStatus status     = 3;
+}
+
+enum AckStatus {
+  ACK_STATUS_UNSPECIFIED = 0;
+  SENT                   = 1;   // 服务端已收到并落库
+  DELIVERED              = 2;   // 已投递到对端设备
+  REJECTED               = 3;   // 被服务端拒绝 (重复/非法)
+}
+
+// ============================================================
+//  已读回执
+// ============================================================
+
+message ReadReceipt {
+  string user_id           = 1;   // 执行"已读"的用户
+  string conversation_id   = 2;   // 会话 ID (对端用户 ID 或群组 ID)
+  int64  last_read_msg_id  = 3;   // 该会话已读到的 server_msg_id
+}
+
+// ============================================================
+//  离线消息同步 — 水位线拉取
+// ============================================================
+
+message SyncRequest {
+  int64  last_server_msg_id = 1;  // 客户端本地最大 server_msg_id
+  int32  limit              = 2;  // 单次拉取上限 (默认 50)
+}
+
+message SyncResponse {
+  repeated ChatMessage messages = 1;
+  bool has_more                 = 2;  // 服务端是否还有更多
+}
+
+// ============================================================
+//  在线状态通知
+// ============================================================
+
+message PresenceNotify {
+  string       user_id = 1;
+  PresenceStatus status = 2;
+}
+
+enum PresenceStatus {
+  PRESENCE_STATUS_UNSPECIFIED = 0;
+  ONLINE                      = 1;
+  OFFLINE                     = 2;
+}
+
+// ============================================================
+//  AI 机器人 — 非流式 / 流式响应
+// ============================================================
+
+message BotRequest {
+  string bot_id         = 1;
+  string conversation_id = 2;
+  string prompt         = 3;
+  bool   stream         = 4;   // 是否请求流式响应
+}
+
+message BotResponse {
+  string bot_id         = 1;
+  string conversation_id = 2;
+  string content        = 3;   // 完整响应 (非流式)
+}
+
+message BotStreamChunk {
+  string bot_id         = 1;
+  string conversation_id = 2;
+  string delta          = 3;   // 增量文本片段
+  bool   finished       = 4;   // 流是否结束
+}
+
+// ============================================================
+//  会话管理 — 多设备挤占踢下线
+// ============================================================
+
+message KickNotice {
+  string reason    = 1;
+  string device_id = 2;   // 新登录的设备 ID
+}
+
+// ============================================================
+//  错误通知
+// ============================================================
+
+message ErrorNotice {
+  int32  code    = 1;
+  string message = 2;
+}
