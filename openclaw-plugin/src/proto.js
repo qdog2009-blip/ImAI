@@ -95,7 +95,7 @@ export async function buildEnvelope(type, payloadKey, payloadValue) {
 
   const msg = Envelope.create({
     type,
-    timestampMs: BigInt(Date.now()),
+    timestampMs: Date.now(),
     requestId: randomUUID().replace(/-/g, ""),
     [payloadKey]: payloadValue,
   });
