@@ -45,7 +45,7 @@ export class ImAIClient {
     this._userId = "";
     this._token = "";
     this._ws = null;
-    this._lastServerMsgId = 0n;
+    this._lastServerMsgId = 0;
     this._stopped = false;
   }
 

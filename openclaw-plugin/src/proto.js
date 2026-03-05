@@ -132,9 +132,9 @@ export async function buildAuthRequest(serverSecretKey, token, deviceId) {
   });
 }
 
-export async function buildSyncRequest(lastServerMsgId = 0n, limit = 50) {
+export async function buildSyncRequest(lastServerMsgId = 0, limit = 50) {
   return buildEnvelope(EnvelopeType.SYNC_REQUEST, "syncRequest", {
-    lastServerMsgId: BigInt(lastServerMsgId),
+    lastServerMsgId: Number(lastServerMsgId),
     limit,
   });
 }
