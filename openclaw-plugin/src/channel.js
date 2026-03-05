@@ -233,6 +233,7 @@ export function createImAIChannel() {
           /** 水位线更新时持久化到磁盘 */
           onLastMsgIdUpdate: (id) => {
             try {
+              fs.mkdirSync(path.dirname(watermarkPath), { recursive: true });
               fs.writeFileSync(watermarkPath, JSON.stringify({ lastServerMsgId: id }), "utf8");
             } catch (err) {
               logger.error(`[imai] 水位线写入失败: ${err.message}`);

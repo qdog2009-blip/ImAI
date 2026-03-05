@@ -120,7 +120,7 @@ async def _handle_chat_message(conn: Connection, envelope) -> None:
         build_message_ack(client_msg_id, server_msg_id, AckStatus.SENT),
     )
 
-    # ④ 在线推送 → 接收方
+    # ④ 在线推送 → 接收方，并记录已投递水位线防止 SyncResponse 重复下发
     receiver_id = msg.receiver_id
     if receiver_id and manager.is_online(receiver_id):
         msg.server_msg_id = server_msg_id
@@ -128,6 +128,7 @@ async def _handle_chat_message(conn: Connection, envelope) -> None:
         await manager.send_to_user(
             receiver_id, build_chat_message_envelope(msg),
         )
+        await message_service.mark_delivered(receiver_id, server_msg_id)
 
     logger.debug(
         "ws.chat  %s→%s  smid=%d  cid=%s",

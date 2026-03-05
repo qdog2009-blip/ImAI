@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
     cache = create_cache_provider()
     manager = ConnectionManager(cache=cache)
-    msg_svc = MessageService(session_factory=AsyncSessionLocal)
+    msg_svc = MessageService(session_factory=AsyncSessionLocal, cache=cache)
 
     from app.api.ws import init_router
     init_router(manager, msg_svc)
