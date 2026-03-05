@@ -283,7 +283,19 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
 
     const ctx = reply.finalizeInboundContext(rawCtx);
 
-    // 2. 通过 dispatchReplyWithBufferedBlockDispatcher 路由到 OpenClaw AI 并回复
+    // 2. 持久化 session 元数据 (WebUI 依赖此记录展示会话)
+    const { session } = channelRuntime;
+    const storePath = session.resolveStorePath(undefined, {});
+    await session.recordInboundSession({
+      storePath,
+      sessionKey: rawCtx.SessionKey,
+      ctx,
+      onRecordError: (err) => {
+        logger.error(`[imai] session 记录失败: ${err.message}`);
+      },
+    });
+
+    // 3. 通过 dispatchReplyWithBufferedBlockDispatcher 路由到 OpenClaw AI 并回复
     const client = _clients.get(account.id);
     await reply.dispatchReplyWithBufferedBlockDispatcher({
       ctx,
