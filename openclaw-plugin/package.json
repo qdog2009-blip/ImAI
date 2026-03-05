@@ -4,6 +4,7 @@
   "description": "OpenClaw channel plugin for ImAI self-hosted IM server",
   "type": "module",
   "main": "./src/index.js",
+  "openclaw.extensions": ["./src/index.js"],
   "exports": {
     ".": "./src/index.js"
   },
