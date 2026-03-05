@@ -262,9 +262,8 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
     return;
   }
 
-  const reply = channelRuntime.channel.reply;
-
   try {
+    const reply = channelRuntime.reply;
     // 1. 构建最终化消息上下文 (FinalizedMsgContext)
     const rawCtx = {
       Body:              incoming.text,
