@@ -262,20 +262,12 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
     return;
   }
 
-  const { reply } = channelRuntime;
+  const reply = channelRuntime.channel.reply;
 
   try {
-    // 1. 格式化消息头部元信息 (OpenClaw 内部格式)
-    const formattedBody = reply.formatInboundEnvelope({
-      channel:  CHANNEL_ID,
-      from:     incoming.senderId,
-      body:     incoming.text,
-      chatType: "direct",
-    });
-
-    // 2. 构建最终化消息上下文 (FinalizedMsgContext)
+    // 1. 构建最终化消息上下文 (FinalizedMsgContext)
     const rawCtx = {
-      Body:              formattedBody,
+      Body:              incoming.text,
       RawBody:           incoming.text,
       CommandBody:       incoming.text,
       From:              incoming.senderId,
@@ -292,8 +284,23 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
 
     const ctx = reply.finalizeInboundContext(rawCtx);
 
-    // 3. 通过 dispatchReplyFromConfig 路由到 OpenClaw AI 并回复
-    await reply.dispatchReplyFromConfig({ ctx, cfg });
+    // 2. 通过 dispatchReplyWithBufferedBlockDispatcher 路由到 OpenClaw AI 并回复
+    const client = _clients.get(account.id);
+    await reply.dispatchReplyWithBufferedBlockDispatcher({
+      ctx,
+      cfg,
+      dispatcherOptions: {
+        deliver: async (payload) => {
+          const text = payload.text ?? payload.body ?? "";
+          if (text && client) {
+            await client.sendText(incoming.senderId, text);
+          }
+        },
+        onError: (err) => {
+          logger.error(`[imai] 回复发送失败: ${err.message}`);
+        },
+      },
+    });
   } catch (err) {
     logger.error(`[imai] 路由消息失败: ${err.message}`);
   }
