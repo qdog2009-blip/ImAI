@@ -282,12 +282,10 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
     };
 
     const ctx = reply.finalizeInboundContext(rawCtx);
-    logger.info(`[imai] finalizeInboundContext → ctx=${JSON.stringify(ctx)}`);
 
     // 2. 持久化 session 元数据 (WebUI 依赖此记录展示会话)
     const { session } = channelRuntime;
     const storePath = session.resolveStorePath(undefined, {});
-    logger.info(`[imai] recordInboundSession storePath=${JSON.stringify(storePath)} sessionKey=${rawCtx.SessionKey}`);
     await session.recordInboundSession({
       storePath,
       sessionKey: rawCtx.SessionKey,
@@ -299,14 +297,12 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
 
     // 3. 通过 dispatchReplyWithBufferedBlockDispatcher 路由到 OpenClaw AI 并回复
     const client = _clients.get(account.id);
-    logger.info(`[imai] 开始 dispatch, client=${client ? "ok" : "missing"}`);
-    const dispatchResult = await reply.dispatchReplyWithBufferedBlockDispatcher({
+    await reply.dispatchReplyWithBufferedBlockDispatcher({
       ctx,
       cfg,
       dispatcherOptions: {
         deliver: async (payload) => {
           const text = payload.text ?? payload.body ?? "";
-          logger.info(`[imai] deliver 回调触发 text=${text.slice(0, 80)}`);
           if (text && client) {
             await client.sendText(incoming.senderId, text);
           }
@@ -316,7 +312,6 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
         },
       },
     });
-    logger.info(`[imai] dispatch 完成 result=${JSON.stringify(dispatchResult)}`);
   } catch (err) {
     logger.error(`[imai] 路由消息失败: ${err.message}`);
   }
