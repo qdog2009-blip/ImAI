@@ -248,6 +248,16 @@ export function createImAIChannel() {
             }
           },
 
+          /** WebSocket 握手完成后通知 OpenClaw 状态变为 linked */
+          onConnected: () => {
+            setStatus?.({ id: account.id, state: "linked", label: `${account.username} 已连接` });
+          },
+
+          /** 连接断开进入重连等待时通知 OpenClaw，避免 health-monitor 误判 stale-socket */
+          onReconnecting: (attempt) => {
+            setStatus?.({ id: account.id, state: "configured", label: `重新连接中… (第 ${attempt} 次)` });
+          },
+
           /** 收到 ImAI 用户消息时的回调 */
           onMessage: async (incoming) => {
             await _routeIncoming({ incoming, account, cfg, channelRuntime, logger });
@@ -255,7 +265,6 @@ export function createImAIChannel() {
         });
 
         _clients.set(account.id, client);
-        setStatus?.({ id: account.id, state: "linked", label: `${account.username} 已连接` });
 
         try {
           await client.run(abortSignal);

@@ -31,6 +31,8 @@ export class ImAIClient {
    * @param {string} opts.password
    * @param {string} [opts.deviceId]
    * @param {function} opts.onMessage        - async (msg: IncomingMessage) => void
+   * @param {function} [opts.onConnected]    - () => void，WebSocket 握手完成后调用
+   * @param {function} [opts.onReconnecting] - (attempt: number) => void，重连等待开始时调用
    * @param {object}  [opts.log]             - { info, warn, error, debug }
    */
   constructor(opts) {
@@ -40,6 +42,8 @@ export class ImAIClient {
     this.password = opts.password;
     this.deviceId = opts.deviceId ?? "openclaw-plugin";
     this.onMessage = opts.onMessage;
+    this.onConnected    = opts.onConnected    ?? null;
+    this.onReconnecting = opts.onReconnecting ?? null;
     this.log = opts.log ?? console;
     /** 初始水位线（从持久化存储中加载） */
     this._lastServerMsgId = opts.initialLastMsgId ?? 0;
@@ -76,6 +80,7 @@ export class ImAIClient {
         this.log.warn(
           `[imai] 连接异常: ${err.message}，${delay / 1000}s 后第 ${attempt} 次重连…`
         );
+        this.onReconnecting?.(attempt);
         await sleep(delay, signal);
       }
     }
@@ -163,6 +168,8 @@ export class ImAIClient {
           ws.send(await buildAuthRequest(this.serverSecretKey, this._token, this.deviceId));
           // 拉取离线消息
           ws.send(await buildSyncRequest(this._lastServerMsgId));
+          // 握手完成，通知外部状态已连接
+          this.onConnected?.();
         } catch (err) {
           this.log.error(`[imai] 握手异常: ${err.message}`);
         }
