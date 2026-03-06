@@ -104,7 +104,7 @@ export function createImAIChannel() {
       resolveAccount(cfg, accountId) {
         const id = accountId ?? "default";
         const stored = getAccounts(cfg)[id] ?? {};
-        return { id, ...stored };
+        return { id, ...stored, enabled: stored.enabled ?? true };
       },
 
       /** 默认账号 ID */
