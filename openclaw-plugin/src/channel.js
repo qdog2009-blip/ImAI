@@ -213,8 +213,10 @@ export function createImAIChannel() {
         let initialLastMsgId = 0;
         try {
           const data = JSON.parse(fs.readFileSync(watermarkPath, "utf8"));
-          if (typeof data.lastServerMsgId === "number") {
-            initialLastMsgId = data.lastServerMsgId;
+          // protobufjs Long.toJSON() 返回字符串，兼容 number 和 string 两种形式
+          const parsed = Number(data.lastServerMsgId);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            initialLastMsgId = parsed;
           }
         } catch {
           // 文件不存在或解析失败时从 0 开始

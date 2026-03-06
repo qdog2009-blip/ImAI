@@ -203,9 +203,11 @@ export class ImAIClient {
 
       case EnvelopeType.CHAT_MESSAGE: {
         const msg = envelope.chatMessage;
-        if (msg.serverMsgId > this._lastServerMsgId) {
-          this._lastServerMsgId = msg.serverMsgId;
-          this._onLastMsgIdUpdate?.(this._lastServerMsgId);
+        // protobufjs int64 → Long 对象，需转成 JS number 后才能正确 JSON 序列化
+        const smid = Number(msg.serverMsgId);
+        if (smid > this._lastServerMsgId) {
+          this._lastServerMsgId = smid;
+          this._onLastMsgIdUpdate?.(smid);
         }
         await this._handleChatMessage(msg);
         break;
@@ -217,12 +219,12 @@ export class ImAIClient {
           `[imai] 离线消息同步 count=${sync.messages?.length ?? 0} has_more=${sync.hasMore}`
         );
         for (const msg of sync.messages ?? []) {
-          if (msg.serverMsgId > this._lastServerMsgId) {
-            this._lastServerMsgId = msg.serverMsgId;
+          const smid = Number(msg.serverMsgId);
+          if (smid > this._lastServerMsgId) {
+            this._lastServerMsgId = smid;
           }
           await this._handleChatMessage(msg);
-        }
-        if (sync.messages?.length > 0) {
+          // 每条消息处理完后立即持久化，避免进程崩溃导致水位线丢失
           this._onLastMsgIdUpdate?.(this._lastServerMsgId);
         }
         break;
