@@ -208,18 +208,22 @@ export function createImAIChannel() {
           path.dirname(sessionsPath),
           `imai-${account.id}-watermark.json`
         );
+        logger.info(`[imai] sessionsPath=${sessionsPath}`);
+        logger.info(`[imai] watermarkPath=${watermarkPath}`);
 
         // 加载持久化水位线
         let initialLastMsgId = 0;
         try {
-          const data = JSON.parse(fs.readFileSync(watermarkPath, "utf8"));
+          const raw = fs.readFileSync(watermarkPath, "utf8");
+          logger.info(`[imai] 水位线文件内容: ${raw}`);
+          const data = JSON.parse(raw);
           // protobufjs Long.toJSON() 返回字符串，兼容 number 和 string 两种形式
           const parsed = Number(data.lastServerMsgId);
           if (Number.isFinite(parsed) && parsed > 0) {
             initialLastMsgId = parsed;
           }
-        } catch {
-          // 文件不存在或解析失败时从 0 开始
+        } catch (err) {
+          logger.info(`[imai] 水位线文件不存在或读取失败: ${err.message}`);
         }
         logger.info(`[imai] 加载水位线 lastServerMsgId=${initialLastMsgId}`);
 
@@ -236,7 +240,9 @@ export function createImAIChannel() {
           onLastMsgIdUpdate: (id) => {
             try {
               fs.mkdirSync(path.dirname(watermarkPath), { recursive: true });
-              fs.writeFileSync(watermarkPath, JSON.stringify({ lastServerMsgId: id }), "utf8");
+              const content = JSON.stringify({ lastServerMsgId: id });
+              fs.writeFileSync(watermarkPath, content, "utf8");
+              logger.info(`[imai] 水位线已写入 ${watermarkPath} → ${content}`);
             } catch (err) {
               logger.error(`[imai] 水位线写入失败: ${err.message}`);
             }

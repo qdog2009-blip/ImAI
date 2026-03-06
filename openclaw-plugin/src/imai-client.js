@@ -227,6 +227,11 @@ export class ImAIClient {
           // 每条消息处理完后立即持久化，避免进程崩溃导致水位线丢失
           this._onLastMsgIdUpdate?.(this._lastServerMsgId);
         }
+        // 若服务端还有更多历史消息，继续拉取，直到 has_more=false
+        if (sync.hasMore && this._ws?.readyState === WebSocket.OPEN) {
+          this.log.info(`[imai] has_more=true，继续拉取 from=${this._lastServerMsgId}`);
+          this._ws.send(await buildSyncRequest(this._lastServerMsgId));
+        }
         break;
       }
 
