@@ -10,7 +10,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { ImAIClient } from "./imai-client.js";
+
+const _require = createRequire(import.meta.url);
+const _manifest = _require("../openclaw.plugin.json");
 
 const CHANNEL_ID = "imai";
 
@@ -88,6 +92,9 @@ export function createImAIChannel() {
       label:    "ImAI",
       docsPath: "channels/imai",
     },
+
+    // OpenClaw web UI 通过此字段渲染配置表单（与 openclaw.plugin.json 保持一致）
+    configSchema: _manifest.configSchema,
 
     capabilities: {
       text: true,
@@ -178,11 +185,39 @@ export function createImAIChannel() {
       },
     },
 
-    // ────────── Status：探测账号运行状态 ──────────
+    // ────────── Status：运行状态监控 ──────────
     status: {
       /**
-       * OpenClaw web UI 和 CLI 通过本方法探测账号是否正在运行。
-       * 返回 { ok: true } 时显示 Running: Yes，否则 Running: No。
+       * 初始化运行时状态对象。OpenClaw 在启动账号前调用，
+       * 并将该对象（filled by startAccount lifecycle）传给 buildAccountSnapshot。
+       */
+      defaultRuntime() {
+        return {
+          running: false,
+          lastStartAt: null,
+          lastStopAt: null,
+          lastError: null,
+        };
+      },
+
+      /**
+       * 构建账号状态快照，供 web UI 和 CLI 展示。
+       * running 字段来自 OpenClaw 内部的 runtime.running（startAccount 执行期间为 true）。
+       */
+      buildAccountSnapshot({ account, runtime, snapshot, probe }) {
+        return {
+          accountId: account.id,
+          name:      account.username ?? account.id,
+          enabled:   account.enabled ?? true,
+          configured: !!(account.serverUrl && account.username),
+          running:   runtime?.running ?? snapshot?.running ?? false,
+          probe,
+        };
+      },
+
+      /**
+       * 探测账号连通性（Connected 字段）。
+       * 返回 { ok: true } 表示 WebSocket 连接活跃。
        */
       async probeAccount({ account }) {
         const client = _clients.get(account.id);
