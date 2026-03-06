@@ -178,6 +178,21 @@ export function createImAIChannel() {
       },
     },
 
+    // ────────── Status：探测账号运行状态 ──────────
+    status: {
+      /**
+       * OpenClaw web UI 和 CLI 通过本方法探测账号是否正在运行。
+       * 返回 { ok: true } 时显示 Running: Yes，否则 Running: No。
+       */
+      async probeAccount({ account }) {
+        const client = _clients.get(account.id);
+        if (!client) {
+          return { ok: false, error: "no active client" };
+        }
+        return { ok: true };
+      },
+    },
+
     // ────────── Gateway：长驻连接 ──────────
     gateway: {
       /**
