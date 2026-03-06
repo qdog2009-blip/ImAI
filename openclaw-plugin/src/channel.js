@@ -134,9 +134,10 @@ export function createImAIChannel() {
       describeAccount(account) {
         const configured = !!(account.serverUrl && account.username);
         return {
-          id:    account.id,
-          state: configured ? "configured" : "not configured",
-          label: configured
+          id:      account.id,
+          enabled: account.enabled ?? true,
+          state:   configured ? "configured" : "not configured",
+          label:   configured
             ? `${account.username}@${account.serverUrl}`
             : "(未配置)",
         };
