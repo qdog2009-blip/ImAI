@@ -66,6 +66,9 @@ async def _dispatch(conn: Connection, data: bytes) -> None:
         return
 
     match envelope.type:
+        case EnvelopeType.AUTH_REQUEST:
+            pass  # 鉴权已通过 query param 完成，此帧为客户端扩展预留，忽略
+
         case EnvelopeType.PONG:
             conn.record_pong()
 
