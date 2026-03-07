@@ -93,8 +93,41 @@ export function createImAIChannel() {
       docsPath: "channels/imai",
     },
 
-    // OpenClaw web UI 通过此字段渲染配置表单（与 openclaw.plugin.json 保持一致）
-    configSchema: _manifest.configSchema,
+    // OpenClaw web UI 通过此字段渲染账号配置表单（描述单账号字段）
+    configSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["serverUrl", "serverSecretKey", "username", "password"],
+      properties: {
+        serverUrl: {
+          type: "string",
+          title: "Server URL",
+          description: "ImAI server HTTP base URL, e.g. http://localhost:8000",
+        },
+        serverSecretKey: {
+          type: "string",
+          title: "Server Secret Key",
+          description: "SERVER_SECRET_KEY configured on the ImAI server",
+          format: "password",
+        },
+        username: {
+          type: "string",
+          title: "Username",
+          description: "ImAI account username for the OpenClaw bot",
+        },
+        password: {
+          type: "string",
+          title: "Password",
+          description: "ImAI account password for the OpenClaw bot",
+          format: "password",
+        },
+        deviceId: {
+          type: "string",
+          title: "Device ID",
+          description: "Unique device identifier (defaults to openclaw-plugin)",
+        },
+      },
+    },
 
     capabilities: {
       text: true,
