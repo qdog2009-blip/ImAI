@@ -18,17 +18,15 @@ const _require = createRequire(import.meta.url);
 const CHANNEL_ID = "imai";
 
 // ------------------------------------------------------------------ //
-//  Config schema — 使用 openclaw/plugin-sdk + zod 构建，与 DingTalk 一致
-//  在 OpenClaw 运行时环境中两者都可用（peer dependencies）；
-//  开发/CI 环境无 openclaw 时静默降级为 null（web UI 显示 unavailable）。
+//  Config schema — 同步 require openclaw/plugin-sdk + zod
+//  （与 DingTalk 插件一致，peer dependency 在 OpenClaw 运行时可用）
+//  开发环境无 openclaw 时静默降级为 null（web UI 显示 unavailable）
 // ------------------------------------------------------------------ //
 
 let _configSchema = null;
 try {
-  const [{ z }, { buildChannelConfigSchema }] = await Promise.all([
-    import("zod"),
-    import("openclaw/plugin-sdk"),
-  ]);
+  const { z } = _require("zod");
+  const { buildChannelConfigSchema } = _require("openclaw/plugin-sdk");
 
   const AccountSchema = z.object({
     serverUrl:       z.string(),
@@ -45,7 +43,7 @@ try {
 
   _configSchema = buildChannelConfigSchema(ChannelConfigSchema);
 } catch {
-  // Not running inside OpenClaw — configSchema remains null
+  // Not running inside OpenClaw or SDK unavailable — configSchema stays null
 }
 
 /** 每个账号对应一个活跃客户端 */

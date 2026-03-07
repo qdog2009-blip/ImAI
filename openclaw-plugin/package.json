@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./src/index.js",
   "openclaw": {
-    "extensions": ["./src/index.js"]
+    "extensions": ["./src/index.js"],
+    "installDependencies": true
   },
   "exports": {
     ".": "./src/index.js"
@@ -19,7 +20,8 @@
   },
   "dependencies": {
     "protobufjs": "^7.4.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/ws": "^8.5.0"
