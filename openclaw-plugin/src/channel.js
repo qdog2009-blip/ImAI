@@ -221,22 +221,38 @@ export function createImAIChannel() {
        */
       defaultRuntime: {
         running: false,
+        connected: false,
         lastStartAt: null,
         lastStopAt: null,
+        lastEventAt: null,
         lastError: null,
       },
 
       /**
-       * 构建账号状态快照，供 web UI 和 CLI 展示。
-       * running 字段来自 OpenClaw 内部的 runtime.running（startAccount 执行期间为 true）。
+       * 构建账号状态快照，供 health-monitor 和 web UI 使用。
+       *
+       * health-monitor 读取以下字段判断连接健康度：
+       *   running      — 账号是否正在运行（startAccount 执行期间）
+       *   connected    — WebSocket 是否已建立（false 触发 disconnected 重启）
+       *   lastStartAt  — 连接建立时间戳（ms）；用于计算 stale-socket 起点
+       *   lastEventAt  — 最后一次收到服务端事件的时间戳（ms）；
+       *                  超过 staleEventThresholdMs（30分钟）未更新 → stale-socket
+       *
+       * ImAI 服务端每 30 秒发送一次 PING，onHeartbeat 回调会更新 lastEventAt，
+       * 确保 health-monitor 始终认为连接是活跃的。
        */
       buildAccountSnapshot({ account, runtime, snapshot, probe }) {
         return {
-          accountId: account.id,
-          name:      account.username ?? account.id,
-          enabled:   account.enabled ?? true,
-          configured: !!(account.serverUrl && account.username),
-          running:   runtime?.running ?? snapshot?.running ?? false,
+          accountId:   account.id,
+          name:        account.username ?? account.id,
+          enabled:     account.enabled ?? true,
+          configured:  !!(account.serverUrl && account.username),
+          running:     runtime?.running     ?? snapshot?.running     ?? false,
+          connected:   runtime?.connected   ?? snapshot?.connected,
+          lastStartAt: runtime?.lastStartAt ?? snapshot?.lastStartAt ?? null,
+          lastStopAt:  runtime?.lastStopAt  ?? snapshot?.lastStopAt  ?? null,
+          lastEventAt: runtime?.lastEventAt ?? snapshot?.lastEventAt ?? null,
+          lastError:   runtime?.lastError   ?? snapshot?.lastError   ?? null,
           probe,
         };
       },
@@ -326,19 +342,25 @@ export function createImAIChannel() {
             }
           },
 
-          /** WebSocket 握手完成后将 runtime.running 置 true，health-monitor 依此判断连接存活 */
+          /** WebSocket 握手完成后设置 running/connected/lastStartAt/lastEventAt */
           onConnected: () => {
-            setStatus?.({ ...getStatus?.(), running: true, lastStartAt: Date.now(), lastError: null });
+            const now = Date.now();
+            setStatus?.({ ...getStatus?.(), running: true, connected: true, lastStartAt: now, lastEventAt: now, lastError: null });
           },
 
-          /** 连接断开进入重连等待时将 running 置 false，避免 health-monitor 误判连接正常 */
+          /** 连接断开进入重连等待时将 connected 置 false */
           onReconnecting: (attempt) => {
-            setStatus?.({ ...getStatus?.(), running: false, lastError: `reconnecting (attempt ${attempt})` });
+            setStatus?.({ ...getStatus?.(), running: false, connected: false, lastError: `reconnecting (attempt ${attempt})` });
           },
 
-          /** 每次收到服务端 PING（30s 周期）刷新 running: true，持续证明连接活跃 */
+          /**
+           * 每次收到服务端 PING（30s 周期）更新 lastEventAt。
+           * health-monitor 用 lastEventAt 判断 stale-socket：
+           *   超过 30 分钟无事件 → 触发重启
+           * PING 每 30 秒一次，远低于 30 分钟阈值，可彻底消除 stale-socket。
+           */
           onHeartbeat: () => {
-            setStatus?.({ ...getStatus?.(), running: true });
+            setStatus?.({ ...getStatus?.(), running: true, connected: true, lastEventAt: Date.now() });
           },
 
           /** 收到 ImAI 用户消息时的回调 */
@@ -353,7 +375,7 @@ export function createImAIChannel() {
           await client.run(abortSignal);
         } finally {
           _clients.delete(account.id);
-          setStatus?.({ ...getStatus?.(), running: false, lastStopAt: Date.now() });
+          setStatus?.({ ...getStatus?.(), running: false, connected: false, lastStopAt: Date.now() });
         }
       },
 
