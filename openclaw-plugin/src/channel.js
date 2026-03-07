@@ -216,16 +216,14 @@ export function createImAIChannel() {
     // ────────── Status：运行状态监控 ──────────
     status: {
       /**
-       * 初始化运行时状态对象。OpenClaw 在启动账号前调用，
-       * 并将该对象（filled by startAccount lifecycle）传给 buildAccountSnapshot。
+       * 初始化运行时状态对象。OpenClaw 将此对象作为初始 runtime 状态，
+       * 并通过 setStatus 持续更新（必须是对象，不能是工厂函数）。
        */
-      defaultRuntime() {
-        return {
-          running: false,
-          lastStartAt: null,
-          lastStopAt: null,
-          lastError: null,
-        };
+      defaultRuntime: {
+        running: false,
+        lastStartAt: null,
+        lastStopAt: null,
+        lastError: null,
       },
 
       /**
@@ -272,7 +270,7 @@ export function createImAIChannel() {
        *   ctx.setStatus      — 更新账号在线状态
        */
       async startAccount(ctx) {
-        const { account, cfg, abortSignal, channelRuntime, setStatus, log } = ctx;
+        const { account, cfg, abortSignal, channelRuntime, setStatus, getStatus, log } = ctx;
 
         const logger = {
           info:  (msg) => log?.info(msg)  ?? console.info(msg),
@@ -280,8 +278,6 @@ export function createImAIChannel() {
           error: (msg) => log?.error(msg) ?? console.error(msg),
           debug: (msg) => log?.debug?.(msg),
         };
-
-        setStatus?.({ id: account.id, state: "configured", label: "连接中…" });
 
         // 推导水位线文件路径（与 sessions.json 同目录）
         const { session } = channelRuntime;
@@ -330,19 +326,19 @@ export function createImAIChannel() {
             }
           },
 
-          /** WebSocket 握手完成后通知 OpenClaw 状态变为 linked */
+          /** WebSocket 握手完成后将 runtime.running 置 true，health-monitor 依此判断连接存活 */
           onConnected: () => {
-            setStatus?.({ id: account.id, state: "linked", label: `${account.username} 已连接` });
+            setStatus?.({ ...getStatus?.(), running: true, lastStartAt: Date.now(), lastError: null });
           },
 
-          /** 连接断开进入重连等待时通知 OpenClaw，避免 health-monitor 误判 stale-socket */
+          /** 连接断开进入重连等待时将 running 置 false，避免 health-monitor 误判连接正常 */
           onReconnecting: (attempt) => {
-            setStatus?.({ id: account.id, state: "configured", label: `重新连接中… (第 ${attempt} 次)` });
+            setStatus?.({ ...getStatus?.(), running: false, lastError: `reconnecting (attempt ${attempt})` });
           },
 
-          /** 每次收到服务端 PING 时刷新 linked 状态，防止 health-monitor 因长时间无状态变更触发 stale-socket */
+          /** 每次收到服务端 PING（30s 周期）刷新 running: true，持续证明连接活跃 */
           onHeartbeat: () => {
-            setStatus?.({ id: account.id, state: "linked", label: `${account.username} 已连接` });
+            setStatus?.({ ...getStatus?.(), running: true });
           },
 
           /** 收到 ImAI 用户消息时的回调 */
@@ -357,7 +353,7 @@ export function createImAIChannel() {
           await client.run(abortSignal);
         } finally {
           _clients.delete(account.id);
-          setStatus?.({ id: account.id, state: "not linked", label: "已断开" });
+          setStatus?.({ ...getStatus?.(), running: false, lastStopAt: Date.now() });
         }
       },
 
