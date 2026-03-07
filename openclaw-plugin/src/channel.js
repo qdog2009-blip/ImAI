@@ -418,39 +418,52 @@ async function _routeIncoming({ incoming, account, cfg, channelRuntime, logger }
   }
 
   try {
-    const reply = channelRuntime.reply;
-    // 1. 构建最终化消息上下文 (FinalizedMsgContext)
-    const rawCtx = {
+    const { reply, session, routing } = channelRuntime;
+
+    // 1. 通过 resolveAgentRoute 获取正确的 agent 格式 session key（如 agent:main:main）
+    //    OpenClaw 的 session 列表和会话查看器依赖此格式；
+    //    具体的 per-user 还是共享 session 取决于用户在配置中设置的 session.dmScope。
+    const route = routing.resolveAgentRoute({
+      cfg,
+      channel:   CHANNEL_ID,
+      accountId: account.id,
+      peer: { kind: "direct", id: incoming.senderId },
+    });
+
+    // 2. 构建最终化消息上下文 (FinalizedMsgContext)
+    const ctx = reply.finalizeInboundContext({
       Body:              incoming.text,
       RawBody:           incoming.text,
       CommandBody:       incoming.text,
-      From:              incoming.senderId,
-      To:                account.username,   // bot 用户名即接收方
-      SessionKey:        `${CHANNEL_ID}:${account.id}:${incoming.senderId}`,
-      Provider:          account.id,
+      From:              `${CHANNEL_ID}:${incoming.senderId}`,
+      To:                `${CHANNEL_ID}:${account.username}`,
+      SessionKey:        route.sessionKey,
+      AccountId:         route.accountId,
+      Provider:          CHANNEL_ID,
       Surface:           CHANNEL_ID,
       MessageSid:        incoming.serverMsgId || incoming.clientMsgId,
       ChatType:          "direct",
       ConversationLabel: incoming.senderId,
+      SenderName:        incoming.senderId,
+      SenderId:          incoming.senderId,
+      OriginatingChannel: CHANNEL_ID,
+      OriginatingTo:     `${CHANNEL_ID}:${incoming.senderId}`,
       CommandAuthorized: false,
       UntrustedContext:  [],
-    };
+    });
 
-    const ctx = reply.finalizeInboundContext(rawCtx);
-
-    // 2. 持久化 session 元数据 (WebUI 依赖此记录展示会话)
-    const { session } = channelRuntime;
-    const storePath = session.resolveStorePath(undefined, {});
+    // 3. 持久化 session 元数据（WebUI session 列表依赖此记录）
+    const storePath = session.resolveStorePath(cfg.session?.store, { agentId: route.agentId });
     await session.recordInboundSession({
       storePath,
-      sessionKey: rawCtx.SessionKey,
+      sessionKey: ctx.SessionKey ?? route.sessionKey,
       ctx,
       onRecordError: (err) => {
         logger.error(`[imai] session 记录失败: ${err.message}`);
       },
     });
 
-    // 3. 通过 dispatchReplyWithBufferedBlockDispatcher 路由到 OpenClaw AI 并回复
+    // 4. 通过 dispatchReplyWithBufferedBlockDispatcher 路由到 OpenClaw AI 并回复
     const client = _clients.get(account.id);
     await reply.dispatchReplyWithBufferedBlockDispatcher({
       ctx,
