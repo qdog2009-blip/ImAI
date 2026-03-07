@@ -224,6 +224,9 @@ export function createImAIChannel() {
         if (!client) {
           return { ok: false, error: "no active client" };
         }
+        if (!client._ws || client._ws.readyState !== 1) {
+          return { ok: false, error: "websocket not open" };
+        }
         return { ok: true };
       },
     },
@@ -307,6 +310,11 @@ export function createImAIChannel() {
           /** 连接断开进入重连等待时通知 OpenClaw，避免 health-monitor 误判 stale-socket */
           onReconnecting: (attempt) => {
             setStatus?.({ id: account.id, state: "configured", label: `重新连接中… (第 ${attempt} 次)` });
+          },
+
+          /** 每次收到服务端 PING 时刷新 linked 状态，防止 health-monitor 因长时间无状态变更触发 stale-socket */
+          onHeartbeat: () => {
+            setStatus?.({ id: account.id, state: "linked", label: `${account.username} 已连接` });
           },
 
           /** 收到 ImAI 用户消息时的回调 */

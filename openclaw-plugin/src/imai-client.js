@@ -44,6 +44,7 @@ export class ImAIClient {
     this.onMessage = opts.onMessage;
     this.onConnected    = opts.onConnected    ?? null;
     this.onReconnecting = opts.onReconnecting ?? null;
+    this.onHeartbeat    = opts.onHeartbeat    ?? null;
     this.log = opts.log ?? console;
     /** 初始水位线（从持久化存储中加载） */
     this._lastServerMsgId = opts.initialLastMsgId ?? 0;
@@ -206,6 +207,7 @@ export class ImAIClient {
       case EnvelopeType.PING:
         this._ws?.send(await buildPong());
         this.log.debug?.("[imai] Ping → Pong");
+        this.onHeartbeat?.();
         break;
 
       case EnvelopeType.CHAT_MESSAGE: {
