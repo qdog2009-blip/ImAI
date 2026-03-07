@@ -14,9 +14,39 @@ import { createRequire } from "node:module";
 import { ImAIClient } from "./imai-client.js";
 
 const _require = createRequire(import.meta.url);
-const _manifest = _require("../openclaw.plugin.json");
 
 const CHANNEL_ID = "imai";
+
+// ------------------------------------------------------------------ //
+//  Config schema — 使用 openclaw/plugin-sdk + zod 构建，与 DingTalk 一致
+//  在 OpenClaw 运行时环境中两者都可用（peer dependencies）；
+//  开发/CI 环境无 openclaw 时静默降级为 null（web UI 显示 unavailable）。
+// ------------------------------------------------------------------ //
+
+let _configSchema = null;
+try {
+  const [{ z }, { buildChannelConfigSchema }] = await Promise.all([
+    import("zod"),
+    import("openclaw/plugin-sdk"),
+  ]);
+
+  const AccountSchema = z.object({
+    serverUrl:       z.string(),
+    serverSecretKey: z.string(),
+    username:        z.string(),
+    password:        z.string(),
+    deviceId:        z.string().optional(),
+    enabled:         z.boolean().optional().default(true),
+  });
+
+  const ChannelConfigSchema = AccountSchema.extend({
+    accounts: z.record(z.string(), AccountSchema.optional()).optional(),
+  });
+
+  _configSchema = buildChannelConfigSchema(ChannelConfigSchema);
+} catch {
+  // Not running inside OpenClaw — configSchema remains null
+}
 
 /** 每个账号对应一个活跃客户端 */
 const _clients = new Map();
@@ -93,41 +123,8 @@ export function createImAIChannel() {
       docsPath: "channels/imai",
     },
 
-    // OpenClaw web UI 通过此字段渲染账号配置表单（描述单账号字段）
-    configSchema: {
-      type: "object",
-      additionalProperties: false,
-      required: ["serverUrl", "serverSecretKey", "username", "password"],
-      properties: {
-        serverUrl: {
-          type: "string",
-          title: "Server URL",
-          description: "ImAI server HTTP base URL, e.g. http://localhost:8000",
-        },
-        serverSecretKey: {
-          type: "string",
-          title: "Server Secret Key",
-          description: "SERVER_SECRET_KEY configured on the ImAI server",
-          format: "password",
-        },
-        username: {
-          type: "string",
-          title: "Username",
-          description: "ImAI account username for the OpenClaw bot",
-        },
-        password: {
-          type: "string",
-          title: "Password",
-          description: "ImAI account password for the OpenClaw bot",
-          format: "password",
-        },
-        deviceId: {
-          type: "string",
-          title: "Device ID",
-          description: "Unique device identifier (defaults to openclaw-plugin)",
-        },
-      },
-    },
+    // 由模块顶部的 buildChannelConfigSchema(ZodSchema) 生成（同 DingTalk 插件）
+    configSchema: _configSchema,
 
     capabilities: {
       text: true,
